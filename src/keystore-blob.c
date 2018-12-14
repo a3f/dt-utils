@@ -30,7 +30,7 @@ int keystore_get_secret(const char *name, const unsigned char **key, int *key_le
 	if (!state) {
 		struct state *tmp;
 
-		tmp = state_get(keystore_state_name, true, false);
+		tmp = state_get(keystore_state_name, NULL, true, false);
 		if (IS_ERR(tmp))
 			return  PTR_ERR(tmp);
 		state = tmp;
