@@ -2423,7 +2423,17 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 		/* when partuuid is specified short-circuit the search for the cdev */
 		ret = of_property_read_string(partition_node, "partuuid", &uuid);
 		if (!ret) {
-			*devpath = basprintf("/dev/disk/by-partuuid/%s", uuid);
+			const char prefix[] = "/dev/disk/by-partuuid/";
+			size_t prefix_len = sizeof(prefix) - 1;
+			char *lc_uuid, *s;
+
+			lc_uuid = xzalloc(prefix_len + strlen(uuid) + 1);
+			s = memcpy(lc_uuid, prefix, prefix_len) + prefix_len;
+
+			while (*uuid)
+				*s++ = tolower(*uuid++);
+
+			*devpath = lc_uuid;
 
 			return 0;
 		}
