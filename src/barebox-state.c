@@ -381,6 +381,7 @@ struct state *state_get(const char *name, const char *filename, bool readonly, b
 enum opt {
 	OPT_DUMP_SHELL = UCHAR_MAX + 1,
 	OPT_VERSION    = UCHAR_MAX + 2,
+	OPT_NO_LOCK    = UCHAR_MAX + 3,
 };
 
 static struct option long_options[] = {
@@ -391,6 +392,7 @@ static struct option long_options[] = {
 	{"dump",	no_argument,		0,	'd' },
 	{"dump-shell",	no_argument,		0,	OPT_DUMP_SHELL },
 	{"force",	no_argument,		0,	'f' },
+	{"no-lock",	no_argument,		0,	OPT_NO_LOCK },
 	{"verbose",	no_argument,		0,	'v' },
 	{"quiet",	no_argument,		0,	'q' },
 	{"version",	no_argument,		0,	OPT_VERSION },
@@ -410,6 +412,7 @@ static void usage(char *name)
 "-d, --dump                                dump the state\n"
 "--dump-shell                              dump the state suitable for shell sourcing\n"
 "-f, --force                               do not check for state manipulation via the HMAC\n"
+"--no-lock                                 do not use lock file to guard access\n"
 "-v, --verbose                             increase verbosity\n"
 "-q, --quiet                               decrease verbosity\n"
 "--version                                 display version\n"
@@ -447,6 +450,7 @@ int main(int argc, char *argv[])
 	int pr_level = 5;
 	int auth = 1;
 	const char *dtb = NULL;
+	bool use_lock_file = true;
 
 	INIT_LIST_HEAD(&sg_list);
 	INIT_LIST_HEAD(&state_list.list);
@@ -477,6 +481,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			auth = 0;
+			break;
+		case OPT_NO_LOCK:
+			use_lock_file = false;
 			break;
 		case 'd':
 			do_dump = 1;
@@ -530,17 +537,19 @@ int main(int argc, char *argv[])
 		++nr_states;
 	}
 
-	lock_fd = open("/var/lock/barebox-state", O_CREAT | O_RDWR, 0600);
-	if (lock_fd < 0) {
-		pr_err("Failed to open lock-file /var/lock/barebox-state\n");
-		exit(1);
-	}
+	if (use_lock_file) {
+		lock_fd = open("/var/lock/barebox-state", O_CREAT | O_RDWR, 0600);
+		if (lock_fd < 0) {
+			pr_err("Failed to open lock-file /var/lock/barebox-state\n");
+			exit(1);
+		}
 
-	ret = flock(lock_fd, LOCK_EX);
-	if (ret < 0) {
-		pr_err("Failed to lock /var/lock/barebox-state: %m\n");
-		close(lock_fd);
-		exit(1);
+		ret = flock(lock_fd, LOCK_EX);
+		if (ret < 0) {
+			pr_err("Failed to lock /var/lock/barebox-state: %m\n");
+			close(lock_fd);
+			exit(1);
+		}
 	}
 
 	list_for_each_entry(state, &state_list.list, list) {
@@ -662,8 +671,10 @@ int main(int argc, char *argv[])
 
 	ret = 0;
 out_unlock:
-	flock(lock_fd, LOCK_UN);
-	close(lock_fd);
+	if (use_lock_file) {
+		flock(lock_fd, LOCK_UN);
+		close(lock_fd);
+	}
 
 	return ret;
 }
