@@ -51,6 +51,8 @@ static char *__state_mac_get(struct state_variable *var);
 static int __state_string_set(struct state_variable *var, const char *val);
 static char *__state_string_get(struct state_variable *var);
 
+enum state_action { STATE_ACTION_GET, STATE_ACTION_SET, STATE_ACTION_UPDATE };
+
 struct variable_str_type {
 	enum state_variable_type type;
 	char *type_name;
@@ -279,7 +281,8 @@ char *state_get_var(struct state *state, const char *var)
 	return vtype->get(sv);
 }
 
-static int state_set_var(struct state *state, const char *var, const char *val)
+static int state_set_var(struct state *state, const char *var, const char *val,
+			 enum state_action action)
 {
 	struct state_variable *sv;
 	struct variable_str_type *vtype;
@@ -295,6 +298,18 @@ static int state_set_var(struct state *state, const char *var, const char *val)
 
 	if (!vtype->set)
 		return -EPERM;
+
+	if (action == STATE_ACTION_UPDATE) {
+		char *oldval = vtype->get(sv);
+
+		if (!IS_ERR(oldval)) {
+			if (!strcmp(oldval, val)) {
+				free(oldval);
+				return 0;
+			}
+			free(oldval);
+		}
+	}
 
 	ret = vtype->set(sv, val);
 	if (ret)
@@ -387,6 +402,7 @@ enum opt {
 static struct option long_options[] = {
 	{"get",		required_argument,	0,	'g' },
 	{"set",		required_argument,	0,	's' },
+	{"update",	required_argument,	0,	'u' },
 	{"name",	required_argument,	0,	'n' },
 	{"input",	required_argument,	0,	'i' },
 	{"dump",	no_argument,		0,	'd' },
@@ -407,6 +423,7 @@ static void usage(char *name)
 "\n"
 "-g, --get <variable>                      get the value of a variable\n"
 "-s, --set <variable>=<value>              set the value of a variable\n"
+"-u, --update <variable>=<value>           update the value of a variable only if it changed\n"
 "-n, --name <name>                         specify the state to use (default=\"state\"). Multiple states are allowed.\n"
 "-i, --input <name>                        load the devicetree from a file instead of using the system devicetree.\n"
 "-d, --dump                                dump the state\n"
@@ -425,7 +442,7 @@ static void usage(char *name)
 
 struct state_set_get {
 	char *arg;
-	int get;
+	enum state_action action;
 	struct list_head list;
 };
 
@@ -456,7 +473,7 @@ int main(int argc, char *argv[])
 	INIT_LIST_HEAD(&state_list.list);
 
 	while (1) {
-		c = getopt_long(argc, argv, "hg:s:i:dvn:qf", long_options, &option_index);
+		c = getopt_long(argc, argv, "hg:u:s:i:dvn:qf", long_options, &option_index);
 		if (c < 0)
 			break;
 		switch (c) {
@@ -468,13 +485,14 @@ int main(int argc, char *argv[])
 			exit(0);
 		case 'g':
 			sg = xzalloc(sizeof(*sg));
-			sg->get = 1;
+			sg->action = STATE_ACTION_GET;
 			sg->arg = optarg;
 			list_add_tail(&sg->list, &sg_list);
 			break;
+		case 'u':
 		case 's':
 			sg = xzalloc(sizeof(*sg));
-			sg->get = 0;
+			sg->action = c == 's' ? STATE_ACTION_SET : STATE_ACTION_UPDATE;
 			sg->arg = optarg;
 			list_add_tail(&sg->list, &sg_list);
 			readonly = false;
@@ -627,7 +645,7 @@ int main(int argc, char *argv[])
 		if (state == &state_list) {
 			state = list_first_entry(&state_list.list, struct state_list, list);
 		}
-		if (sg->get) {
+		if (sg->action == STATE_ACTION_GET) {
 			char *val = state_get_var(state->state, arg);
 			if (!val) {
 				pr_err("no such variable: %s\n", arg);
@@ -647,7 +665,7 @@ int main(int argc, char *argv[])
 				goto out_unlock;
 			}
 			*val++ = '\0';
-			ret = state_set_var(state->state, var, val);
+			ret = state_set_var(state->state, var, val, sg->action);
 			if (ret) {
 				pr_err("Failed to set variable %s in state %s to %s: %s\n",
 						var, state->name, val,
