@@ -342,6 +342,31 @@ struct state *state_get(const char *name, const char *filename, bool readonly, b
 		}
 	} else {
 		root = of_read_proc_devicetree();
+
+		/* No device-tree in procfs / sysfs, try dtb file in the ESP */
+		if (-PTR_ERR(root) == ENOENT) {
+			const char *paths[] = {
+				/* default mount paths used by systemd */
+				"/boot/EFI/BAREBOX/state.dtb",
+				"/boot/efi/EFI/BAREBOX/state.dtb",
+				"/efi/EFI/BAREBOX/state.dtb",
+				NULL
+			};
+			void *fdt;
+			int i;
+
+			for (i = 0; paths[i]; ++i) {
+				fdt = read_file(paths[i], NULL);
+				if (fdt)
+					break;
+			}
+			if (fdt) {
+				root = of_unflatten_dtb(fdt);
+				free(fdt);
+			}
+			else
+				root = ERR_PTR(-ENOENT);
+		}
 		if (IS_ERR(root)) {
 			pr_err("Unable to read devicetree. %s\n",
 			       strerror(-PTR_ERR(root)));
