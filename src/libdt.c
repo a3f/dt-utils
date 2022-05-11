@@ -2381,7 +2381,6 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 {
 	struct device_node *node;
 	struct udev_device *dev, *partdev, *mtd;
-	const char *partname;
 	int ret;
 
 	*offset = 0;
@@ -2451,16 +2450,18 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 		return -ENODEV;
 	}
 
-	/* find the name of the partition... */
-	ret = of_property_read_string(partition_node, "label", &partname);
-	if (ret) {
-		fprintf(stderr, "%s: no 'label' property found in %s\n", __func__,
-			partition_node->full_name);
-		return ret;
-	}
-
 	mtd = of_find_mtd_device(dev);
 	if (mtd) {
+		const char *partname;
+
+		/* find the name of the partition... */
+		ret = of_property_read_string(partition_node, "label", &partname);
+		if (ret) {
+			fprintf(stderr, "%s: no 'label' property found in %s\n", __func__,
+				partition_node->full_name);
+			return ret;
+		}
+
 		/* ...find the udev_device by partition name... */
 		partdev = device_find_mtd_partition(dev, partname);
 		if (!partdev)
