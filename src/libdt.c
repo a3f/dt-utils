@@ -2358,6 +2358,47 @@ out:
 	return dev;
 }
 
+static struct udev_device *of_find_device_by_uuid(const char *uuid)
+{
+	struct udev *udev;
+	struct udev_enumerate *enumerate;
+	struct udev_list_entry *devices, *dev_list_entry;
+
+	udev = udev_new();
+	if (!udev) {
+		  fprintf(stderr, "Can't create udev\n");
+		  return NULL;
+	}
+
+	enumerate = udev_enumerate_new(udev);
+	udev_enumerate_add_match_subsystem(enumerate, "block");
+	udev_enumerate_scan_devices(enumerate);
+	devices = udev_enumerate_get_list_entry(enumerate);
+	udev_list_entry_foreach(dev_list_entry, devices) {
+		const char *path, *devtype, *dev_uuid;
+		struct udev_device *device;
+
+		path = udev_list_entry_get_name(dev_list_entry);
+		device = udev_device_new_from_syspath(udev, path);
+
+		/* distinguish device (disk) from partitions */
+		devtype = udev_device_get_devtype(device);
+		if (!devtype)
+			continue;
+		if (!strcmp(devtype, "disk")) {
+			dev_uuid = udev_device_get_property_value(device, "ID_PART_TABLE_UUID");
+			if (dev_uuid && !strcasecmp(dev_uuid, uuid))
+				return device;
+		} else if (!strcmp(devtype, "partition")) {
+			dev_uuid = udev_device_get_property_value(device, "ID_PART_ENTRY_UUID");
+			if (dev_uuid && !strcasecmp(dev_uuid, uuid))
+				return device;
+		}
+
+	}
+	return NULL;
+}
+
 /*
  * of_get_devicepath - get information how to access device corresponding to a device_node
  * @partition_node:	The device_node which shall be accessed
@@ -2443,11 +2484,29 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 	if (!strcmp(node->name, "partitions"))
 		node = node->parent;
 
-	dev = of_find_device_by_node_path(node->full_name);
-	if (!dev) {
-		fprintf(stderr, "%s: cannot find device from node %s\n", __func__,
-				node->full_name);
-		return -ENODEV;
+	if (of_device_is_compatible(node, "barebox,storage-by-uuid")) {
+		const char *uuid;
+
+		ret = of_property_read_string(node, "uuid", &uuid);
+		if (ret) {
+			fprintf(stderr, "%s: missing uuid property for %s\n", __func__,
+					node->full_name);
+			return -ENODEV;
+		}
+		dev = of_find_device_by_uuid(uuid);
+		if (!dev) {
+			fprintf(stderr, "%s: cannot find device for uuid %s\n", __func__,
+				uuid);
+			return -ENODEV;
+		}
+	}
+	else {
+		dev = of_find_device_by_node_path(node->full_name);
+		if (!dev) {
+			fprintf(stderr, "%s: cannot find device from node %s\n", __func__,
+					node->full_name);
+			return -ENODEV;
+		}
 	}
 
 	mtd = of_find_mtd_device(dev);
