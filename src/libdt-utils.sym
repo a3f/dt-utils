@@ -64,6 +64,7 @@ global:
 	of_property_read_u8_array;
 	of_property_write_bool;
 	of_property_write_string;
+	of_property_write_strings;
 	of_property_write_u16_array;
 	of_property_write_u32_array;
 	of_property_write_u64_array;
