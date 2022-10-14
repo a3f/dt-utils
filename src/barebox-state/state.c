@@ -93,7 +93,7 @@ out:
  */
 static int state_do_load(struct state *state, enum state_flags flags)
 {
-	void *buf;
+	void *buf = NULL;
 	ssize_t len;
 	int ret;
 
@@ -102,7 +102,7 @@ static int state_do_load(struct state *state, enum state_flags flags)
 	if (ret) {
 		dev_err(&state->dev, "Failed to read state with format %s, %d\n",
 			state->format->name, ret);
-		return ret;
+		goto out;
 	}
 
 	ret = state->format->unpack(state->format, state, buf, len);
@@ -113,9 +113,8 @@ static int state_do_load(struct state *state, enum state_flags flags)
 	}
 
 	state->init_from_defaults = 0;
-	state->dirty = 0;
-
 out:
+	state->dirty = !!ret; /* mark dirty on error */
 	free(buf);
 	return ret;
 }
