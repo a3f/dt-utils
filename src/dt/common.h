@@ -207,8 +207,12 @@ static inline size_t DT_strlcpy(char *dest, const char *src, size_t size)
 
 static inline char *xstrdup(const char *s)
 {
-	char *p = strdup(s);
+	char *p;
 
+	if (!s)
+		return NULL;
+
+	p = strdup(s);
 	if (!p)
 		exit(EXIT_FAILURE);
 
