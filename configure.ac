@@ -27,6 +27,15 @@ AS_IF([test "x${enable_state_backward_compatibility}" = "xyes"], [
         AC_DEFINE(CONFIG_STATE_BACKWARD_COMPATIBLE, [0])
 ])
 
+AC_ARG_ENABLE([lock-device],
+        AS_HELP_STRING([--enable-lock-device], [barebox-state: lock device node instead of global lock in /run @<:@default=disabled@:>@]),
+        [], [enable_lock_device=no])
+AS_IF([test "x${enable_lock_device}" = "xyes"], [
+        AC_DEFINE(CONFIG_LOCK_DEVICE_NODE, [1], [lock device node backing state.])
+], [
+        AC_DEFINE(CONFIG_LOCK_DEVICE_NODE, [0], [use global lock in /run.])
+])
+
 AC_DEFINE(CONFIG_MTD, [1], [Statically define to be enabled to harmonize barebox' & dt-utils' code base.])
 
 AC_DEFINE(CONFIG_STATE, [1], [Statically define to be enabled to harmonize barebox' & dt-utils' code base.])

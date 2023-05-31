@@ -658,6 +658,10 @@ struct state *state_new_from_node(struct device_node *node, bool readonly)
 	pr_debug("%s: backend resolved to %s %lld %zu\n", node->full_name,
 		 state->backend_path, (long long)offset, size);
 
+	/* will be released on program exit */
+	if (IS_ENABLED(CONFIG_LOCK_DEVICE_NODE))
+		(void)open_exclusive(state->backend_path, readonly ? O_RDONLY : O_RDWR);
+
 	state->backend_reproducible_name = of_get_reproducible_name(partition_node);
 
 	ret = of_property_read_string(node, "backend-type", &backend_type);

@@ -3,6 +3,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <driver.h>
+#include <sys/file.h>
 
 struct state;
 struct mtd_info_user;
@@ -268,4 +269,24 @@ static inline int state_string_copy_to_raw(struct state_string *string,
 	memset(string->raw + len, 0x0, string->var.size - len);
 
 	return 0;
+}
+
+static inline int open_exclusive(const char *path, int flags)
+{
+	int fd;
+
+	fd = open(path, flags);
+	if (fd < 0)
+		return fd;
+
+	if (IS_ENABLED(CONFIG_LOCK_DEVICE_NODE)) {
+		int ret = flock(fd, LOCK_EX);
+		if (ret < 0) {
+			pr_err("Failed to lock %s: %d\n", path, -errno);
+			close(fd);
+			return -EWOULDBLOCK;
+		}
+	}
+
+	return fd;
 }

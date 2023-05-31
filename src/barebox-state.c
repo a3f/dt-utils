@@ -499,6 +499,8 @@ int main(int argc, char *argv[])
 			printf(PACKAGE_STRING "\n");
 			printf("Configured with build-time option '--%s-state-backward-compatibility'.\n",
 			       (CONFIG_STATE_BACKWARD_COMPATIBLE) ? "enable" : "disable");
+			printf("                                  '--%s-lock-device-node'.\n",
+			       (CONFIG_LOCK_DEVICE_NODE) ? "enable" : "disable");
 			exit(0);
 		case 'g':
 			sg = xzalloc(sizeof(*sg));
@@ -568,17 +570,19 @@ int main(int argc, char *argv[])
 		++nr_states;
 	}
 
-	lock_fd = open(BAREBOX_STATE_LOCKFILE, O_CREAT | O_RDWR, 0600);
-	if (lock_fd < 0) {
-		pr_err("Failed to open lock-file " BAREBOX_STATE_LOCKFILE "\n");
-		exit(1);
-	}
+	if (!IS_ENABLED(CONFIG_LOCK_DEVICE_NODE)) {
+		lock_fd = open(BAREBOX_STATE_LOCKFILE, O_CREAT | O_RDWR, 0600);
+		if (lock_fd < 0) {
+			pr_err("Failed to open lock-file " BAREBOX_STATE_LOCKFILE "\n");
+			exit(1);
+		}
 
-	ret = flock(lock_fd, LOCK_EX);
-	if (ret < 0) {
-		pr_err("Failed to lock " BAREBOX_STATE_LOCKFILE ": %m\n");
-		close(lock_fd);
-		exit(1);
+		ret = flock(lock_fd, LOCK_EX);
+		if (ret < 0) {
+			pr_err("Failed to lock " BAREBOX_STATE_LOCKFILE ": %m\n");
+			close(lock_fd);
+			exit(1);
+		}
 	}
 
 	list_for_each_entry(state, &state_list.list, list) {
@@ -700,8 +704,10 @@ int main(int argc, char *argv[])
 
 	ret = 0;
 out_unlock:
-	flock(lock_fd, LOCK_UN);
-	close(lock_fd);
+	if (!IS_ENABLED(CONFIG_LOCK_DEVICE_NODE)) {
+		flock(lock_fd, LOCK_UN);
+		close(lock_fd);
+	}
 
 	return ret;
 }
