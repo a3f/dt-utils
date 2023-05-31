@@ -81,10 +81,8 @@ int keystore_get_secret(const char *name, const unsigned char **key, int *key_le
 
 	/* payload */
 	fd = open(blob_gen_payload, O_RDONLY);
-	if (fd < 0) {
-		free(blob_bin);
+	if (fd < 0)
 		return -errno;
-	}
 
 	payload = xzalloc(len);
 	len = read(fd, payload, len);
