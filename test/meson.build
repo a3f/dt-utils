@@ -24,3 +24,13 @@ foreach test_name : tests
     timeout : 240,
     workdir : meson.source_root())
 endforeach
+
+test(
+  'barebox-state.t',
+  find_program('barebox-state.t'),
+  args : '-v',
+  is_parallel : false,
+  timeout : 300,
+  env : ['SHARNESS_BUILD_DIRECTORY=' + meson.build_root()],
+  workdir : meson.current_source_dir(),
+)

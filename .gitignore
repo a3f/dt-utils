@@ -16,6 +16,7 @@ Makefile.in
 /tags
 /TAGS
 /build/
+/test/test-results
 
 /fdtdump
 /src/libdt-utils.pc

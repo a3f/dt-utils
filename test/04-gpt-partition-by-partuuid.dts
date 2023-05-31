@@ -1,0 +1,31 @@
+/dts-v1/;
+
+#include "barebox-state.dtsi"
+
+/ {
+	expected-dev = __GPT_LOOPDEV__;
+	expected-partno = <2>;
+	expected-offset = <0x00000>;
+	expected-size = <0x8000>;
+
+	disk: loopfile {
+		compatible = "barebox,hostfile";
+		barebox,filename = __GPT_LOOPDEV__;
+		barebox,blockdev;
+	};
+
+	partitions {
+		compatible = "fixed-partitions";
+
+		part_state: state {
+			partuuid = __GPT_LOOPDEV_PARTUUID__;
+		};
+	};
+};
+
+&state {
+	backend = <&part_state>;
+	backend-type = "raw";
+	backend-stridesize = <0x40>;
+	backend-storage-type = "direct";
+};
