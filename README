@@ -32,6 +32,7 @@ The intention is to deprecate autotools eventually in its favor. To build:
 
     meson setup build
     meson compile -C build
+    meson test -C build  # optional
 
 Contributing
 ------------

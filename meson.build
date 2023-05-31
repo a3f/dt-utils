@@ -158,3 +158,5 @@ executable('dtblint',
   dependencies : [versiondep],
   link_with : libdt,
   install : true)
+
+subdir('test')
