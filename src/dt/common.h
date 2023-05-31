@@ -460,7 +460,7 @@ static inline int of_unregister_fixup(int (*fixup)(struct device_node *, void *)
 }
 
 #define __define_initcall(level,fn,id) \
-static void __attribute__ ((constructor)) __initcall_##id##_##fn() { \
+static void __attribute__ ((constructor)) __initcall_##id##_##fn(void) { \
 	fn(); \
 }
 
