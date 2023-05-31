@@ -220,7 +220,6 @@ extern int of_set_root_node(struct device_node *node);
 extern int of_platform_populate(struct device_node *root,
 				const struct of_device_id *matches,
 				struct device_d *parent);
-extern struct device_d *of_find_device_by_node(struct device_node *np);
 
 int of_device_is_stdout_path(struct device_d *dev);
 const char *of_get_model(void);

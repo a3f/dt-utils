@@ -21,6 +21,7 @@ conf.set10('CONFIG_MTD', true)
 conf.set10('CONFIG_STATE', true)
 conf.set10('CONFIG_STATE_BACKWARD_COMPATIBLE', get_option('state-backward-compatibility'))
 conf.set10('CONFIG_LOCK_DEVICE_NODE', get_option('lock-device'))
+conf.set10('CONFIG_TEST_LOOPBACK', get_option('tests'))
 
 meson.add_dist_script(
   find_program('check-news.sh').path(),

@@ -2091,6 +2091,22 @@ struct udev_of_path {
 
 static LIST_HEAD(udev_of_devices);
 
+static const char *udev_device_get_of_path(struct udev_device *dev)
+{
+	const char *of_path;
+
+	of_path = udev_device_get_property_value(dev, "OF_FULLNAME");
+	if (of_path)
+		return of_path;
+
+	if (IS_ENABLED(CONFIG_TEST_LOOPBACK) &&
+	    !strcmp(udev_device_get_subsystem(dev), "block") &&
+	    !strncmp(udev_device_get_sysname(dev), "loop", 4))
+		return udev_device_get_sysname(dev);
+
+	return NULL;
+}
+
 static void of_scan_udev_devices(void)
 {
 	struct udev *udev;
@@ -2111,6 +2127,8 @@ static void of_scan_udev_devices(void)
 	udev_enumerate_add_match_subsystem(enumerate, "spi");
 	udev_enumerate_add_match_subsystem(enumerate, "mtd");
 	udev_enumerate_add_match_subsystem(enumerate, "amba");
+	if (IS_ENABLED(CONFIG_TEST_LOOPBACK))
+		udev_enumerate_add_match_subsystem(enumerate, "block");
 	udev_enumerate_scan_devices(enumerate);
 	devices = udev_enumerate_get_list_entry(enumerate);
 
@@ -2124,7 +2142,7 @@ static void of_scan_udev_devices(void)
 		path = udev_list_entry_get_name(dev_list_entry);
 		dev = udev_device_new_from_syspath(udev, path);
 
-		of_path = udev_device_get_property_value(dev, "OF_FULLNAME");
+		of_path = udev_device_get_of_path(dev);
 		if (!of_path)
 			continue;
 
@@ -2151,6 +2169,28 @@ struct udev_device *of_find_device_by_node_path(const char *of_full_path)
 	}
 
 	return ret;
+}
+
+static struct udev_device *of_find_device_by_node(struct device_node *np)
+{
+	struct udev_of_path *udev_of_path;
+	struct udev_device *dev;
+	const char *filename;
+
+	dev = of_find_device_by_node_path(np->full_name);
+	if (dev)
+		return dev;
+
+	if (IS_ENABLED(CONFIG_TEST_LOOPBACK) &&
+	    !of_property_read_string(np, "barebox,filename", &filename) &&
+	    !strncmp(filename, "/dev/", 5)) {
+		list_for_each_entry(udev_of_path, &udev_of_devices, list) {
+			if (!strcmp(udev_of_path->of_path, filename + 5))
+				return udev_of_path->udev;
+		}
+	}
+
+	return NULL;
 }
 
 static struct udev_device *device_find_mtd_partition(struct udev_device *dev,
@@ -2544,7 +2584,7 @@ static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 	 * 42e9401bd146 ("mtd: Add partition device node to mtd partition
 	 * devices").
 	 */
-	dev = of_find_device_by_node_path(partition_node->full_name);
+	dev = of_find_device_by_node(partition_node);
 	if (dev) {
 		if (udev_device_is_eeprom(dev))
 			return udev_parse_eeprom(dev, &cdev->devpath);
@@ -2619,7 +2659,7 @@ static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 		}
 	}
 	else {
-		dev = of_find_device_by_node_path(node->full_name);
+		dev = of_find_device_by_node(node);
 		if (!dev) {
 			fprintf(stderr, "%s: cannot find device from node %s\n", __func__,
 					node->full_name);

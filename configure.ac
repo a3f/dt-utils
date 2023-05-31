@@ -40,6 +40,8 @@ AC_DEFINE(CONFIG_MTD, [1], [Statically define to be enabled to harmonize barebox
 
 AC_DEFINE(CONFIG_STATE, [1], [Statically define to be enabled to harmonize barebox' & dt-utils' code base.])
 
+AC_DEFINE(CONFIG_TEST_LOOPBACK, [0], [Only enabled in meson for testing.])
+
 AC_CHECK_FUNCS([__secure_getenv secure_getenv])
 
 my_CFLAGS="-Wall \
