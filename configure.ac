@@ -37,7 +37,8 @@ my_CFLAGS="-Wall \
 -Wmissing-declarations -Wmissing-prototypes \
 -Wnested-externs -Wsign-compare -Wchar-subscripts \
 -Wstrict-prototypes -Wshadow \
--Wformat-security -Wtype-limits"
+-Wformat-security -Wtype-limits \
+-fno-strict-aliasing"
 AC_SUBST([my_CFLAGS])
 
 PKG_CHECK_MODULES(UDEV, [libudev])
