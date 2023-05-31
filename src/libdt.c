@@ -1938,7 +1938,7 @@ int of_device_disable_path(const char *path)
 	return of_device_disable(node);
 }
 
-int scan_proc_dir(struct device_node *node, const char *path)
+static int scan_proc_dir(struct device_node *node, const char *path)
 {
 	DIR *dir;
 	struct dirent *dirent;

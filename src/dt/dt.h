@@ -121,6 +121,7 @@ extern struct device_node *of_find_node_by_type(struct device_node *from,
 	const char *type);
 extern struct device_node *of_find_compatible_node(struct device_node *from,
 	const char *type, const char *compat);
+extern struct udev_device *of_find_device_by_node_path(const char *of_full_path);
 extern const struct of_device_id *of_match_node(
 	const struct of_device_id *matches, const struct device_node *node);
 extern struct device_node *of_find_matching_node_and_match(
