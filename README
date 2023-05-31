@@ -13,6 +13,26 @@ For questions, feedback, patches, please send a mail to
 Note: you must be subscribed to post to this mailing list. You can do so by
 sending an empty mail to <oss-tools-subscribe@pengutronix.de>.
 
+Building from Sources
+---------------------
+
+Check out the latest git state:
+
+    git clone https://github.com/barebox/dt-utils
+    cd dt-utils
+
+And then build using autotools:
+
+    ./autogen.sh
+    ./configure
+    make
+
+There's also experimental support for building with meson.
+The intention is to deprecate autotools eventually in its favor. To build:
+
+    meson setup build
+    meson compile -C build
+
 Contributing
 ------------
 

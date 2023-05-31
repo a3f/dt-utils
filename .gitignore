@@ -15,6 +15,7 @@ Makefile.in
 /stamp-h1
 /tags
 /TAGS
+/build/
 
 /fdtdump
 /src/libdt-utils.pc
