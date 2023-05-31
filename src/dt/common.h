@@ -36,6 +36,12 @@ typedef uint64_t u64;
 #undef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
+#define min(x, y) ({				\
+	typeof(x) _min1 = (x);			\
+	typeof(y) _min2 = (y);			\
+	(void) (&_min1 == &_min2);		\
+	_min1 < _min2 ? _min1 : _min2; })
+
 struct device_d;
 
 void pr_level_set(int level);
@@ -197,14 +203,6 @@ static inline size_t DT_strlcpy(char *dest, const char *src, size_t size)
 		dest[len] = '\0';
 	}
 	return ret;
-}
-
-/* Like strncpy but make sure the resulting string is always 0 terminated. */
-static inline char * safe_strncpy(char *dst, const char *src, size_t size)
-{
-	if (!size) return dst;
-	dst[--size] = '\0';
-	return strncpy(dst, src, size);
 }
 
 static inline char *xstrdup(const char *s)
@@ -415,21 +413,23 @@ static inline int dev_set_name(struct device_d *dev, const char *fmt, ...)
 {
 	char newname[MAX_DRIVER_NAME];
 	va_list vargs;
-	int err;
+	int ret;
 
 	va_start(vargs, fmt);
-	err = vsnprintf(newname, MAX_DRIVER_NAME, fmt, vargs);
+	ret = vsnprintf(newname, MAX_DRIVER_NAME, fmt, vargs);
 	va_end(vargs);
+
+	if (WARN_ON(ret < 0))
+		return ret;
 
 	/*
 	 * Copy new name into dev structure, we do this after vsnprintf call in
 	 * case old device name was in one of vargs
 	 */
-	safe_strncpy(dev->name, newname, MAX_DRIVER_NAME);
+	memcpy(dev->name, newname, min(MAX_DRIVER_NAME - 1, ret));
+	dev->name[MAX_DRIVER_NAME - 1] = '\0';
 
-	WARN_ON(err < 0);
-
-	return err;
+	return 0;
 }
 
 struct driver_d;
@@ -576,12 +576,6 @@ static inline __u32 ror32(__u32 word, unsigned int shift)
 {
 	return (word >> shift) | (word << (32 - shift));
 }
-
-#define min(x, y) ({				\
-	typeof(x) _min1 = (x);			\
-	typeof(y) _min2 = (y);			\
-	(void) (&_min1 == &_min2);		\
-	_min1 < _min2 ? _min1 : _min2; })
 
 /*
  * Helper macros to use CONFIG_ options in C expressions. Note that
