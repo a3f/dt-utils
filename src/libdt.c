@@ -2405,7 +2405,9 @@ out:
 	return dev;
 }
 
-static struct udev_device *of_find_device_by_uuid(const char *uuid)
+static struct udev_device *of_find_device_by_uuid(struct udev_device *parent,
+						  const char *uuid,
+						  bool type_uuid)
 {
 	struct udev *udev;
 	struct udev_enumerate *enumerate;
@@ -2418,12 +2420,15 @@ static struct udev_device *of_find_device_by_uuid(const char *uuid)
 	}
 
 	enumerate = udev_enumerate_new(udev);
+	if (parent)
+		udev_enumerate_add_match_parent(enumerate, parent);
 	udev_enumerate_add_match_subsystem(enumerate, "block");
 	udev_enumerate_scan_devices(enumerate);
 	devices = udev_enumerate_get_list_entry(enumerate);
 	udev_list_entry_foreach(dev_list_entry, devices) {
 		const char *path, *devtype, *dev_uuid;
 		struct udev_device *device;
+		const char *property;
 
 		path = udev_list_entry_get_name(dev_list_entry);
 		device = udev_device_new_from_syspath(udev, path);
@@ -2432,16 +2437,19 @@ static struct udev_device *of_find_device_by_uuid(const char *uuid)
 		devtype = udev_device_get_devtype(device);
 		if (!devtype)
 			continue;
-		if (!strcmp(devtype, "disk")) {
-			dev_uuid = udev_device_get_property_value(device, "ID_PART_TABLE_UUID");
-			if (dev_uuid && !strcasecmp(dev_uuid, uuid))
-				return device;
-		} else if (!strcmp(devtype, "partition")) {
-			dev_uuid = udev_device_get_property_value(device, "ID_PART_ENTRY_UUID");
-			if (dev_uuid && !strcasecmp(dev_uuid, uuid))
-				return device;
-		}
 
+		if (type_uuid)
+			property = "ID_PART_ENTRY_TYPE";
+		else if (!strcmp(devtype, "disk"))
+			property = "ID_PART_TABLE_UUID";
+		else if (!strcmp(devtype, "partition"))
+			property = "ID_PART_ENTRY_UUID";
+		else
+			continue;
+
+		dev_uuid = udev_device_get_property_value(device, property);
+		if (dev_uuid && !strcasecmp(dev_uuid, uuid))
+			return device;
 	}
 	return NULL;
 }
@@ -2540,7 +2548,7 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 					node->full_name);
 			return -ENODEV;
 		}
-		dev = of_find_device_by_uuid(uuid);
+		dev = of_find_device_by_uuid(NULL, uuid, false);
 		if (!dev) {
 			fprintf(stderr, "%s: cannot find device for uuid %s\n", __func__,
 				uuid);
