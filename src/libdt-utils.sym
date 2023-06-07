@@ -36,6 +36,8 @@ global:
 	of_get_devicepath;
 	of_cdev_find;
 	cdev_to_devpath;
+	cdev_is_block_disk;
+	cdev_find_child_by_gpt_typeuuid;
 	of_get_next_available_child;
 	of_get_parent;
 	of_get_property;

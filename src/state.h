@@ -2,6 +2,7 @@
 #define __STATE_H
 
 #include <of.h>
+#include <linux/uuid.h>
 
 struct state;
 
@@ -54,5 +55,8 @@ static inline int state_read_mac(struct state *state, const char *name, u8 *buf)
 }
 
 #endif /* #if IS_ENABLED(CONFIG_STATE) / #else */
+
+#define BAREBOX_STATE_PARTITION_GUID \
+	GUID_INIT("4778ed65-bf42-45fa-9c5b-287a1dc4aab1")
 
 #endif /* __STATE_H */

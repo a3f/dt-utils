@@ -22,6 +22,7 @@
 #include <crc.h>
 #include <linux/err.h>
 #include <linux/list.h>
+#include <linux/uuid.h>
 
 #include <linux/mtd/mtd-abi.h>
 #include <malloc.h>
@@ -592,6 +593,8 @@ static char *cdev_to_devpath(struct cdev *cdev, off_t *offset, size_t *size)
 }
 #endif
 
+static guid_t barebox_state_partition_guid = BAREBOX_STATE_PARTITION_GUID;
+
 /*
  * state_new_from_node - create a new state instance from a device_node
  *
@@ -637,6 +640,23 @@ struct state *state_new_from_node(struct device_node *node, bool readonly)
 			       strerror(-ret));
 		goto out_release_state;
 	}
+
+	/* Is the backend referencing an on-disk partitionable block device? */
+	if (cdev_is_block_disk(cdev)) {
+		cdev = cdev_find_child_by_gpt_typeuuid(cdev, &barebox_state_partition_guid);
+		if (IS_ERR(cdev)) {
+			ret = -EINVAL;
+			goto out_release_state;
+		}
+
+		pr_debug("%s: backend GPT partition looked up via PartitionTypeGUID\n",
+			 node->full_name);
+	}
+
+	state->backend_path = cdev_to_devpath(cdev, &offset, &size);
+
+	pr_debug("%s: backend resolved to %s %lld %zu\n", node->full_name,
+		 state->backend_path, (long long)offset, size);
 
 	state->backend_reproducible_name = of_get_reproducible_name(partition_node);
 

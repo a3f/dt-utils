@@ -30,12 +30,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <libudev.h>
+#include <sys/sysmacros.h>
 #include <dt.h>
 
 struct cdev {
 	char *devpath;
 	off_t offset;
 	size_t size;
+	bool is_gpt_partitioned;
+	bool is_block_disk;
 };
 
 static int pr_level = 5;
@@ -2288,8 +2291,13 @@ static int cdev_from_block_device(struct udev_device *dev,
 		}
 	}
 
-	if (best_match)
+	if (best_match) {
+		const char *part_type;
+
 		cdev->devpath = strdup(udev_device_get_devnode(best_match));
+		part_type = udev_device_get_property_value(best_match, "ID_PART_TABLE_TYPE");
+		cdev->is_gpt_partitioned = part_type && !strcmp(part_type, "gpt");
+	}
 
 	udev_enumerate_unref(enumerate);
 	udev_unref(udev);
@@ -2526,6 +2534,8 @@ static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 
 	cdev->offset = 0;
 	cdev->size = 0;
+	cdev->is_gpt_partitioned = false;
+	cdev->is_block_disk = false;
 
 	/*
 	 * simplest case: This nodepath can directly be translated into
@@ -2540,6 +2550,11 @@ static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 			return udev_parse_eeprom(dev, &cdev->devpath);
 		if (!udev_parse_mtd(dev, &cdev->devpath, &cdev->size))
 			return 0;
+
+		if (!cdev_from_block_device(dev, cdev)) {
+			cdev->is_block_disk = true;
+			return 0;
+		}
 
 		/*
 		 * If we find a udev_device but couldn't classify it above,
@@ -2719,4 +2734,81 @@ char *cdev_to_devpath(struct cdev *cdev, off_t *offset, size_t *size)
 	*offset = cdev->offset;
 	*size = cdev->size;
 	return cdev->devpath;
+}
+
+static struct udev_device *udev_from_devpath(struct udev *udev,
+					     const char *devpath)
+{
+	char syspath[64];
+	struct stat st;
+	const char *type;
+	int ret;
+
+	ret = stat(devpath, &st);
+	if (ret)
+		return NULL;
+
+	if (S_ISBLK(st.st_mode))
+		type = "block";
+	else if (S_ISCHR(st.st_mode))
+		type = "char";
+	else
+		return NULL;
+
+	if (major(st.st_rdev) == 0)
+		return NULL;
+
+	snprintf(syspath, sizeof(syspath), "/sys/dev/%s/%u:%u",
+		 type, major(st.st_rdev), minor(st.st_rdev));
+
+	return udev_device_new_from_syspath(udev, syspath);
+}
+
+struct cdev *cdev_find_child_by_gpt_typeuuid(struct cdev *cdev, guid_t *typeuuid)
+{
+	struct cdev *new = ERR_PTR(-ENOENT);
+	struct udev_device *parent, *child;
+	struct udev *udev;
+	u64 size;
+	int ret;
+
+
+	if (!cdev->is_gpt_partitioned)
+		return ERR_PTR(-EINVAL);
+
+	udev = udev_new();
+	if (!udev)
+		return ERR_PTR(-ENOMEM);
+
+	parent = udev_from_devpath(udev, cdev->devpath);
+	if (!parent)
+		goto udev_unref;
+
+	child = of_find_device_by_uuid(parent, typeuuid->str, true);
+	if (!child)
+		goto udev_unref_parent;
+
+	ret = udev_device_parse_sysattr_u64(child, "size", &size);
+	if (ret)
+		goto udev_unref_child;
+
+	new = xzalloc(sizeof(*new));
+
+	new->offset = 0;
+	new->size = size * 512;
+	new->devpath = strdup(udev_device_get_devnode(child));
+
+udev_unref_child:
+	udev_device_unref(child);
+udev_unref_parent:
+	udev_device_unref(parent);
+udev_unref:
+	udev_unref(udev);
+
+	return new;
+}
+
+bool cdev_is_block_disk(struct cdev *cdev)
+{
+	return cdev->is_block_disk;
 }

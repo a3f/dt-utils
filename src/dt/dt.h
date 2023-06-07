@@ -5,6 +5,7 @@
 #include <dt/list.h>
 #include <dt/common.h>
 #include <asm/byteorder.h>
+#include <linux/uuid.h>
 
 /* Default string compare functions */
 #define of_compat_cmp(s1, s2, l)	strcasecmp((s1), (s2))
@@ -233,6 +234,9 @@ int of_get_devicepath(struct device_node *partition_node, char **devnode, off_t 
 
 struct cdev *of_cdev_find(struct device_node *partition_node);
 char *cdev_to_devpath(struct cdev *cdev, off_t *offset, size_t *size);
+
+bool cdev_is_block_disk(struct cdev *cdev);
+struct cdev *cdev_find_child_by_gpt_typeuuid(struct cdev *cdev, guid_t *typeuuid);
 
 #define for_each_node_by_name(dn, name) \
 	for (dn = of_find_node_by_name(NULL, name); dn; \
