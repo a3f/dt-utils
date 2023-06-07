@@ -32,6 +32,12 @@
 #include <libudev.h>
 #include <dt.h>
 
+struct cdev {
+	char *devpath;
+	off_t offset;
+	size_t size;
+};
+
 static int pr_level = 5;
 
 void pr_level_set(int level)
@@ -2482,33 +2488,14 @@ static struct udev_device *of_find_device_by_uuid(struct udev_device *parent,
 	return NULL;
 }
 
-/*
- * of_get_devicepath - get information how to access device corresponding to a device_node
- * @partition_node:	The device_node which shall be accessed
- * @devpath:		Returns the devicepath under which the device is accessible
- * @offset:		Returns the offset in the device
- * @size:		Returns the size of the device
- *
- * This function takes a device_node which represents a partition.
- * For this partition the function returns the device path and the offset
- * and size in the device. For mtd devices the path will be /dev/mtdx, for
- * EEPROMs it will be /sys/.../eeprom and for block devices it will be /dev/...
- * For mtd devices the device path returned will be the partition itself.
- * Since EEPROMs do not have partitions under Linux @offset and @size will
- * describe the offset and size inside the full device. The same applies to
- * block devices.
- *
- * returns 0 for success or negative error value on failure.
- */
-int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t *offset,
-		size_t *size)
+static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 {
 	struct device_node *node;
 	struct udev_device *dev, *partdev, *mtd;
 	int ret;
 
-	*offset = 0;
-	*size = 0;
+	cdev->offset = 0;
+	cdev->size = 0;
 
 	/*
 	 * simplest case: This nodepath can directly be translated into
@@ -2520,8 +2507,8 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 	dev = of_find_device_by_node_path(partition_node->full_name);
 	if (dev) {
 		if (udev_device_is_eeprom(dev))
-			return udev_parse_eeprom(dev, devpath);
-		if (!udev_parse_mtd(dev, devpath, size))
+			return udev_parse_eeprom(dev, &cdev->devpath);
+		if (!udev_parse_mtd(dev, &cdev->devpath, &cdev->size))
 			return 0;
 
 		/*
@@ -2553,7 +2540,7 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 			while (*uuid)
 				*s++ = tolower(*uuid++);
 
-			*devpath = lc_uuid;
+			cdev->devpath = lc_uuid;
 
 			return 0;
 		}
@@ -2609,21 +2596,56 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 			return -ENODEV;
 
 		/* ...find the desired information by mtd udev_device */
-		return udev_parse_mtd(partdev, devpath, size);
+		return udev_parse_mtd(partdev, &cdev->devpath, &cdev->size);
 	}
 
 	if (udev_device_is_eeprom(dev)) {
-		ret = udev_parse_eeprom(dev, devpath);
+		ret = udev_parse_eeprom(dev, &cdev->devpath);
 		if (ret)
 			return ret;
 
-		return of_parse_partition(partition_node, offset, size);
+		return of_parse_partition(partition_node, &cdev->offset, &cdev->size);
 	} else {
-		ret = device_find_block_device(dev, devpath);
+		ret = device_find_block_device(dev, &cdev->devpath);
 		if (ret)
 			return ret;
-		return of_parse_partition(partition_node, offset, size);
+		return of_parse_partition(partition_node, &cdev->offset, &cdev->size);
 	}
 
 	return -EINVAL;
+}
+
+/*
+ * of_get_devicepath - get information how to access device corresponding to a device_node
+ * @partition_node:	The device_node which shall be accessed
+ * @devpath:		Returns the devicepath under which the device is accessible
+ * @offset:		Returns the offset in the device
+ * @size:		Returns the size of the device
+ *
+ * This function takes a device_node which represents a partition.
+ * For this partition the function returns the device path and the offset
+ * and size in the device. For mtd devices the path will be /dev/mtdx, for
+ * EEPROMs it will be /sys/.../eeprom and for block devices it will be /dev/...
+ * For mtd devices the device path returned will be the partition itself.
+ * Since EEPROMs do not have partitions under Linux @offset and @size will
+ * describe the offset and size inside the full device. The same applies to
+ * block devices.
+ *
+ * returns 0 for success or negative error value on failure.
+ */
+int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t *offset,
+		size_t *size)
+{
+	struct cdev cdev = {};
+	int ret;
+
+	ret = __of_cdev_find(partition_node, &cdev);
+	if (ret)
+		return ret;
+
+	*offset = cdev.offset;
+	*size = cdev.size;
+	*devpath = cdev.devpath;
+
+	return 0;
 }
