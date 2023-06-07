@@ -2500,9 +2500,11 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 		}
 
 		/*
-		 * If we found a device but couldn't classify it above, we fall
-		 * through.
+		 * If we find a udev_device but couldn't classify it above,
+		 * it's an error. Falling through would mean to handle it as a
+		 * partition and could lead us to return an arbitrary sibling device
 		 */
+		return -ENODEV;
 	}
 
 	/*
