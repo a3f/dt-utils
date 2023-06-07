@@ -2212,23 +2212,29 @@ static int udev_device_parse_sysattr_u64(struct udev_device *dev, const char *at
 	return 0;
 }
 
+/* True if A completely contains B */
+static bool region_contains(loff_t starta, loff_t enda,
+			    loff_t startb, loff_t endb)
+{
+        return starta <= startb && enda >= endb;
+}
+
 /*
- * device_find_block_device - extract device path from udev block device
+ * cdev_from_block_device - Populate cdev from udev block device
  *
  * @dev:	the udev_device to extract information from
- * @devpath:	returns the devicepath under which the block device is accessible
+ * @cdev:	the cdev output parameter to populate
  *
  * returns 0 for success or negative error value on failure.
  */
-int device_find_block_device(struct udev_device *dev,
-		char **devpath)
+static int cdev_from_block_device(struct udev_device *dev,
+				  struct cdev *cdev)
 {
 
 	struct udev *udev;
 	struct udev_enumerate *enumerate;
 	struct udev_list_entry *devices, *dev_list_entry;
-	struct udev_device *part;
-	const char *outpath;
+	struct udev_device *part, *best_match = NULL;
 	int ret;
 
 	udev = udev_new();
@@ -2252,19 +2258,43 @@ int device_find_block_device(struct udev_device *dev,
 		if (!devtype)
 			continue;
 		if (!strcmp(devtype, "disk")) {
-			outpath = udev_device_get_devnode(part);
-			*devpath = strdup(outpath);
-			ret = 0;
-			goto out;
+			best_match = part;
+
+			/* Should we try to find a matching partition first? */
+			if (!cdev->size)
+				break;
+		} else if (cdev->size && !strcmp(devtype, "partition")) {
+			u64 partstart, partsize;
+
+			ret = udev_device_parse_sysattr_u64(part, "start", &partstart);
+			if (ret)
+				continue;
+
+			ret = udev_device_parse_sysattr_u64(part, "size", &partsize);
+			if (ret)
+				continue;
+
+			/* start/size sys attributes are always in 512-byte units */
+			partstart *= 512;
+			partsize *= 512;
+
+			if (!region_contains(partstart, partstart + partsize,
+					     cdev->offset, cdev->offset + cdev->size))
+				continue;
+
+			best_match = part;
+			cdev->offset -= partstart;
+			break;
 		}
 	}
-	ret = -ENODEV;
 
-out:
+	if (best_match)
+		cdev->devpath = strdup(udev_device_get_devnode(best_match));
+
 	udev_enumerate_unref(enumerate);
 	udev_unref(udev);
 
-	return ret;
+	return best_match ? 0 : -ENODEV;
 }
 
 /*
@@ -2606,10 +2636,10 @@ static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 
 		return of_parse_partition(partition_node, &cdev->offset, &cdev->size);
 	} else {
-		ret = device_find_block_device(dev, &cdev->devpath);
+		ret = of_parse_partition(partition_node, &cdev->offset, &cdev->size);
 		if (ret)
 			return ret;
-		return of_parse_partition(partition_node, &cdev->offset, &cdev->size);
+		return cdev_from_block_device(dev, cdev);
 	}
 
 	return -EINVAL;
