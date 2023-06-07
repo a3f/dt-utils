@@ -2560,18 +2560,22 @@ static int __of_cdev_find(struct device_node *partition_node, struct cdev *cdev)
 		/* when partuuid is specified short-circuit the search for the cdev */
 		ret = of_property_read_string(partition_node, "partuuid", &uuid);
 		if (!ret) {
-			const char prefix[] = "/dev/disk/by-partuuid/";
-			size_t prefix_len = sizeof(prefix) - 1;
-			char *lc_uuid, *s;
+			u64 partsize;
+			int ret;
 
-			lc_uuid = xzalloc(prefix_len + strlen(uuid) + 1);
-			s = memcpy(lc_uuid, prefix, prefix_len) + prefix_len;
+			dev = of_find_device_by_uuid(NULL, uuid, false);
+			if (!dev) {
+				fprintf(stderr, "%s: cannot find device for uuid %s\n", __func__,
+					uuid);
+				return -ENODEV;
+			}
 
-			while (*uuid)
-				*s++ = tolower(*uuid++);
+			ret = udev_device_parse_sysattr_u64(dev, "size", &partsize);
+			if (ret)
+				return -EINVAL;
 
-			cdev->devpath = lc_uuid;
-
+			cdev->size = partsize * 512;
+			cdev->devpath = strdup(udev_device_get_devnode(dev));
 			return 0;
 		}
 	}
