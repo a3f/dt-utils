@@ -2519,13 +2519,10 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 	 */
 	dev = of_find_device_by_node_path(partition_node->full_name);
 	if (dev) {
-		if (udev_device_is_eeprom(dev)) {
+		if (udev_device_is_eeprom(dev))
 			return udev_parse_eeprom(dev, devpath);
-		} else if (!udev_parse_mtd(dev, devpath, size)) {
+		if (!udev_parse_mtd(dev, devpath, size))
 			return 0;
-		} else if (device_find_block_device(dev, devpath)) {
-			return of_parse_partition(partition_node, offset, size);
-		}
 
 		/*
 		 * If we find a udev_device but couldn't classify it above,
