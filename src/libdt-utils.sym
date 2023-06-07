@@ -34,6 +34,8 @@ global:
 	of_get_child_by_name;
 	of_get_child_count;
 	of_get_devicepath;
+	of_cdev_find;
+	cdev_to_devpath;
 	of_get_next_available_child;
 	of_get_parent;
 	of_get_property;

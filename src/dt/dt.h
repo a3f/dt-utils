@@ -231,6 +231,9 @@ void of_add_memory_bank(struct device_node *node, bool dump, int r,
 int of_get_devicepath(struct device_node *partition_node, char **devnode, off_t *offset,
 		size_t *size);
 
+struct cdev *of_cdev_find(struct device_node *partition_node);
+char *cdev_to_devpath(struct cdev *cdev, off_t *offset, size_t *size);
+
 #define for_each_node_by_name(dn, name) \
 	for (dn = of_find_node_by_name(NULL, name); dn; \
 	     dn = of_find_node_by_name(dn, name))

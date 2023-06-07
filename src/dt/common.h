@@ -166,6 +166,14 @@ static inline void *ERR_CAST(const void *ptr)
 	return (void *) ptr;
 }
 
+static inline int PTR_ERR_OR_ZERO(const void *ptr)
+{
+	if (IS_ERR(ptr))
+		return PTR_ERR(ptr);
+	else
+		return 0;
+}
+
 static inline char *barebox_asprintf(const char *fmt, ...) __attribute__ ((format(__printf__, 1, 2)));
 static inline char *barebox_asprintf(const char *fmt, ...)
 {

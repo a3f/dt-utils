@@ -2679,3 +2679,40 @@ int of_get_devicepath(struct device_node *partition_node, char **devpath, off_t 
 
 	return 0;
 }
+
+/*
+ * of_cdev_find - get information how to access device corresponding to a device_node
+ * @partition_node:	The device_node which shall be accessed
+ * @devpath:		Returns the devicepath under which the device is accessible
+ * @offset:		Returns the offset in the device
+ * @size:		Returns the size of the device
+ *
+ * This function takes a device_node which represents a partition.
+ * For this partition the function returns the device path and the offset
+ * and size in the device. For mtd devices the path will be /dev/mtdx, for
+ * EEPROMs it will be /sys/.../eeprom and for block devices it will be /dev/...
+ * For mtd devices the device path returned will be the partition itself.
+ * Since EEPROMs do not have partitions under Linux @offset and @size will
+ * describe the offset and size inside the full device. The same applies to
+ * block devices.
+ *
+ * returns 0 for success or negative error value on failure.
+ */
+struct cdev *of_cdev_find(struct device_node *partition_node)
+{
+	struct cdev cdev = {};
+	int ret;
+
+	ret = __of_cdev_find(partition_node, &cdev);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return xmemdup(&cdev, sizeof(cdev));
+}
+
+char *cdev_to_devpath(struct cdev *cdev, off_t *offset, size_t *size)
+{
+	*offset = cdev->offset;
+	*size = cdev->size;
+	return cdev->devpath;
+}
