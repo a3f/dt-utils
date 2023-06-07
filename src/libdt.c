@@ -2180,6 +2180,33 @@ static struct udev_device *device_find_mtd_partition(struct udev_device *dev,
 }
 
 /*
+ * udev_device_parse_sysattr_u64 - parse sysattr value as unsigned 64-bit integer
+ * @dev:	the udev_device to extract the attribute from
+ * @attr:	name of the attribute to lookup
+ * @outvalue:	returns the value parsed out of the attribute
+ *
+ * returns 0 for success or negative error value on failure.
+ */
+static int udev_device_parse_sysattr_u64(struct udev_device *dev, const char *attr,
+		u64 *outvalue)
+{
+	char *endptr;
+	u64 value;
+	const char *str;
+
+	str = udev_device_get_sysattr_value(dev, attr);
+	if (!str)
+		return -EINVAL;
+
+	value = strtoull(str, &endptr, 0);
+	if (!*str || *endptr)
+		return -EINVAL;
+
+	*outvalue = value;
+	return 0;
+}
+
+/*
  * device_find_block_device - extract device path from udev block device
  *
  * @dev:	the udev_device to extract information from
@@ -2305,24 +2332,25 @@ static int udev_device_is_eeprom(struct udev_device *dev)
  * udev_parse_mtd - get information from a mtd udev_device
  * @dev:	the udev_device to extract information from
  * @devpath:	returns the devicepath under which the mtd device is accessible
- * @size:	returns the size of the mtd device
+ * @outsize:	returns the size of the mtd device
  *
  * returns 0 for success or negative error value on failure. *devpath
  * will be valid on success and must be freed after usage.
  */
-static int udev_parse_mtd(struct udev_device *dev, char **devpath, size_t *size)
+static int udev_parse_mtd(struct udev_device *dev, char **devpath, size_t *outsize)
 {
-	const char *sizestr;
 	const char *outpath;
+	u64 size;
+	int ret;
 
 	if (!udev_device_is_mtd(dev))
 		return -EINVAL;
 
-	sizestr = udev_device_get_sysattr_value(dev, "size");
-	if (!sizestr)
-		return -EINVAL;
+	ret = udev_device_parse_sysattr_u64(dev, "size", &size);
+	if (ret)
+		return ret;
 
-	*size = atol(sizestr);
+	*outsize = size;
 
 	outpath = udev_device_get_devnode(dev);
 	if (!outpath)
