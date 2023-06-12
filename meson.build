@@ -9,6 +9,7 @@ project(
   default_options: [
     'c_std=gnu11',
     'warning_level=2',
+    'optimization=2',
   ],
   license : 'GPL-2.0-only',
 )
