@@ -2,24 +2,24 @@
 option(
   'state-backward-compatibility',
   type : 'boolean',
-  value : 'false',
+  value : false,
   description : 'barebox-state: when using the "direct" storage backend, keep the on-disk format readable by barebox <= v2016.08.0')
 
 option(
   'lock-device',
   type : 'boolean',
-  value : 'false',
+  value : false,
   description : 'lock device node instead of creating lockfile in /run')
 
 # build options
 option(
   'barebox-state',
   type : 'boolean',
-  value : 'true',
+  value : true,
   description : 'Build barebox-state utility')
 
 option(
   'tests',
   type : 'boolean',
-  value : 'true',
+  value : true,
   description : 'Enable/Disable test suite')
