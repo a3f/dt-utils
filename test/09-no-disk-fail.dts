@@ -1,0 +1,26 @@
+/dts-v1/;
+
+#include "barebox-state.dtsi"
+
+/ {
+	expected-dev = "";
+
+	disk: loopfile0 {
+		compatible = "barebox,hostfile";
+		barebox,filename = "/dev/barebox-state-dev-does-not-exist";
+		barebox,blockdev;
+	};
+
+	otherdisk: loopfile1 {
+		compatible = "barebox,hostfile";
+		barebox,filename = __GPT_LOOPDEV__;
+		barebox,blockdev;
+	};
+};
+
+&state {
+	backend = <&disk>;
+	backend-type = "raw";
+	backend-stridesize = <0x40>;
+	backend-storage-type = "direct";
+};
